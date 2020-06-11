@@ -1,0 +1,197 @@
+---
+title: "Presence-absence maps"
+author: "Julen Astigarraga"
+date: "13/4/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Some students designed a sampling in two areas (cut vs. no cut) and in each area 10 transects of 1 meter wide each and 10 m long (100 m^2^) were created. In each transect, the distance of the individuals with respect to the beginning of the transect and their position in three quadrants in the width of the transect (right-center-left to simplify it) were recorded. In the end they obtained a spatial distribution map. The same was repeated in the other area.
+
+
+By meeting the above criteria and adding a few others (e.g. presence probability) using this script you can generate as many maps as you like.
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(tidyverse)
+library(stringr)
+library(patchwork)
+
+##NO CUT (no siega)####
+# This function tells us whether an individual exists or does not exist in a list of 10 data frames each of 30x10 (right-center-left x 10). In this case, the existence of the species goes from 0 to 14 (that is, each one has a probability of appearing of 1/15) and then I got the greater of 13. I did it this way because if I put only 0 and 1 there were too many presences for the purpose of this work. We get random values every time we run the function
+
+
+ind_nosiega <- function(x) {
+  points_indr <- data.frame(replicate(30, sample(0:14, 10, rep = TRUE)))
+  dt_indr <- points_indr
+  data_indr <- do.call(cbind, dt_indr)
+  indr_melt <- melt(data_indr)
+  indr_melt$Var2 <- str_extract(indr_melt$Var2, "\\d+")
+  indr_melt <- indr_melt %>%
+    rename(y = Var1,
+           x = Var2,
+           presence = value)
+  return(indr_melt)
+}
+
+ind_nosiega1 <- ind_nosiega()
+
+lab_y <- rep(1:10)
+lab_x <- c("1i", "1c", "1d", "2i", "2c", "2d", "3i", "3c", "3d", "4i", "4c", "4d", "5i", "5c", "5d", "6i", "6c", "6d", "7i", "7c", "7d", "8i", "8c", "8d", "9i", "9c", "9d", "10i", "10c", "10d")
+
+gg_nosiega <- function(dat) {
+  ggplot(data = dat, aes(x = x, y = as.numeric(y))) + 
+  geom_point(aes(color = presence > 13)) +
+  scale_x_discrete(labels = lab_x) +
+  scale_y_continuous(labels = lab_y, breaks = lab_y) + 
+  scale_color_discrete(name = "", labels = c("Ausencia", "Presencia")) +
+  geom_vline(xintercept = c(3.5, 6.5, 9.5, 12.5, 15.5, 18.5, 21.5, 24.5, 27.5),
+            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+  geom_hline(yintercept = c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5),
+            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    axis.text = element_text(colour = "black", size = 10),
+    axis.title = element_blank(),
+    panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white")
+  )
+}
+
+gg_nosiega(dat = ind_nosiega1)
+
+# now I combine the two functions into one and run it as many times as I want
+gg_nosiega(dat = ind_nosiega())
+
+
+
+# everything could be done at the same time but makes reading tough
+#ind_nosiega <- function(x) {
+#  points_indr <- data.frame(replicate(30, sample(0:1, 10, rep = TRUE)))
+#  points_indr2 <- data.frame(replicate(10, sample(points_indr, rep = FALSE), #simplify = FALSE))
+#  dt_indr <- points_indr2
+#  data_indr <- do.call(cbind, dt_indr)
+#  indr_melt <- melt(data_indr)
+#  x <- rep(1:30, each = 10, times = 10) 
+#  y <- rep(1:10, each = 1, times = 300) 
+#  repli <- rep(1:10, each = 300, times = 1)
+#  indr_melt$Var1 <- NULL
+#  indr_melt$Var2 <- NULL
+#  indr_melt_xy <- cbind(y, x, repli, indr_melt)
+#  return(indr_melt_xy)
+#}
+#
+#ind_nosiega1 <- ind_nosiega()
+#
+#lab_y <- rep(1:10)
+#lab_x <- c("1i", "1c", "1d", "2i", "2c", "2d", "3i", "3c", "3d", "4i", "4c", #"4d", "5i", "5c", "5d", "6i", "6c", "6d", "7i", "7c", "7d", "8i", "8c", "8d", #"9i", "9c", "9d", "10i", "10c", "10d")
+#
+#ggplot(data = ind_nosiega1, aes(x = as.numeric(x), y = as.numeric(y))) + 
+#  geom_point(aes(color = value > 0)) +
+#  scale_x_continuous(labels = lab_x, breaks = 1:30) +
+#  scale_y_continuous(labels = lab_y, breaks = lab_y) + 
+#  facet_wrap(~ repli) +
+#  scale_color_discrete(name = "", labels = c("Ausencia", "Presencia")) +
+#  theme(
+#    legend.position = "right",
+#    legend.text = element_text(size = 10),
+#    axis.text = element_text(colour = "black", size = 10),
+#    axis.title = element_blank()
+#    )
+
+
+##CUT (siega)####
+# In this case the existence of the species goes from 0 to 11 (i.e. each one has a probability of appearing of 1/12) and then I have drawn those greater than 10. You see that here the probability of appearing increases with respect to the no cut. It will be interesting to see what implications this has for spatial clustering
+
+ind_siega <- function(x) {
+  points_ind <- data.frame(replicate(30, sample(0:11, 10, rep = TRUE)))
+  dt_ind <- points_ind
+  data_ind <- do.call(cbind, dt_ind)
+  ind_melt <- melt(data_ind)
+  ind_melt$Var2 <- str_extract(ind_melt$Var2, "\\d+")
+  ind_melt <- ind_melt %>%
+    rename(y = Var1,
+           x = Var2,
+           presence = value)
+  return(ind_melt)
+}
+
+ind_siega1 <- ind_siega()
+
+gg_siega <- function(dat) {
+  ggplot(data = dat, aes(x = x, y = as.numeric(y))) + 
+  geom_point(aes(color = presence > 10)) +
+  scale_x_discrete(labels = lab_x) +
+  scale_y_continuous(labels = lab_y, breaks = lab_y) + 
+  scale_color_discrete(name = "", labels = c("Ausencia", "Presencia")) +
+  geom_vline(xintercept = c(3.5, 6.5, 9.5, 12.5, 15.5, 18.5, 21.5, 24.5, 27.5),
+            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+  geom_hline(yintercept = c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5),
+            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = 10),
+    axis.text.y = element_text(colour = "black", size = 10),
+    axis.title = element_blank(),
+    panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white")
+  )
+}
+
+gg_siega(ind_siega1)
+
+gg_siega(dat = ind_siega())
+
+
+
+# here I modify the legend and combine a couple of maps to get a sample of the results and save them
+#gg_nosiega <- 
+#  ggplot(data = ind_nosiega1, aes(x = x, y = as.numeric(y))) + 
+#  geom_point(aes(color = presence > 5)) +
+#  scale_x_discrete(labels = lab_x) +
+#  scale_y_continuous(labels = lab_y, breaks = lab_y) + 
+#  scale_color_discrete(name = "", labels = c("Ausencia", "Presencia")) +
+#  geom_vline(xintercept = c(3.5, 6.5, 9.5, 12.5, 15.5, 18.5, 21.5, 24.5, 27.5),
+#            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+#  geom_hline(yintercept = c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5),
+#            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+#  theme(
+#    legend.position = "none",
+#    axis.text = element_text(colour = "black", size = 10),
+#    axis.title = element_blank(),
+#    panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+#                                colour = "white")) +
+#  ggtitle("No siega")
+#
+#
+#gg_siega <- 
+#  ggplot(data = ind_siega1, aes(x = x, y = as.numeric(y))) + 
+#  geom_point(aes(color = presence > 3)) +
+#  scale_x_discrete(labels = lab_x) +
+#  scale_y_continuous(labels = lab_y, breaks = lab_y) + 
+#  scale_color_discrete(name = "", labels = c("Ausencia", "Presencia")) +
+#  geom_vline(xintercept = c(3.5, 6.5, 9.5, 12.5, 15.5, 18.5, 21.5, 24.5, 27.5),
+#            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+#  geom_hline(yintercept = c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5),
+#            color = "black", alpha = 0.4, linetype = "solid", size = 0.5) +
+#  theme(
+#    legend.position = "right",
+#    legend.text = element_text(size = 14),
+#    axis.text = element_text(colour = "black", size = 10),
+#    axis.title = element_blank(),
+#    panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+#                                colour = "white")) +
+#  ggtitle("Siega")
+#
+#
+#distribucion <- gg_nosiega + gg_siega
+#
+#ggsave("distribucion.png", distribucion, width = 400, height = 150, 
+#       units = "mm", dpi = 300)
+
+```
+
+
